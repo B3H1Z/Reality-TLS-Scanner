@@ -12,7 +12,6 @@ import tldextract
 URL = "https://bgp.tools/prefix"
 TIMEOUT = 3
 
-
 def send_request(ip):
     ua = UserAgent()
     header = {
