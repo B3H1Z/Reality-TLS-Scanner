@@ -9,15 +9,35 @@ from fake_useragent import UserAgent
 from termcolor import colored
 import tldextract
 
-URL = "https://bgp.tools/prefix"
+URL_MAIN = "https://bgp.tools"
+URL_ROUTE = "/prefix"
+URL = URL_MAIN + URL_ROUTE
 TIMEOUT = 3
+
 
 def send_request(ip):
     ua = UserAgent()
     header = {
         'User-Agent': ua.random,
     }
-    res = requests.get(f"{URL}/{ip}", headers=header, timeout=TIMEOUT)
+
+    try:
+        res_try = requests.get(URL_MAIN, headers=header, timeout=5)
+        if res_try.status_code == 403:
+            print(colored("Your IP BLOCKED by bgp.tools", "red"))
+            return False
+    except requests.exceptions.RequestException as e:
+        print(colored("Cannot connect to bgp.tools \n Check your internet connection", "red"))
+        return False
+
+    try:
+        res = requests.get(
+            f"{URL}/{ip}", headers=header, timeout=TIMEOUT
+        )
+    except requests.exceptions.RequestException as e:
+        print(colored("Cannot connect to bgp.tools \n Please try again", "red"))
+        return False
+
     return res
 
 
@@ -57,6 +77,7 @@ def domain_checker(domain):
     except Exception:
         pass
 
+
 def check_useless_domain(url):
     regex_ip_in_domain = r'(?:[0-9]{1,3}\-){2}[0-9]{1,3}|(?:[0-9]{1,3}\.){2}[0-9]{1,3}'
     regex_subdomain = r'[.-]'
@@ -71,6 +92,7 @@ def check_useless_domain(url):
             return False
     else:
         return False
+
 
 def fdns_html_parser(html):
     domains = []
@@ -135,30 +157,32 @@ if __name__ == '__main__':
     if validate_ipv4_address(input_ip):
         print("Waiting for getting data from bgp.tools ...")
         html_response = send_request(input_ip)
+        if html_response:
+            rdns_domains = rdns_html_parser(html_response.text)
 
-        print("Checking Reversed Dns Domains ...")
-        rdns_domains = rdns_html_parser(html_response.text)
-        if rdns_domains:
-            with alive_bar(len(rdns_domains), force_tty=True) as bar:
-                for rdomain in rdns_domains:
-                    if check_useless_domain(rdomain):
-                        domain_checker(rdomain)
-                    bar.text(rdomain)
-                    bar()
-        else:
-            print(colored("Reverse DNS Domains not found!", "yellow"))
-        print("Checking Forward Dns Domains ...")
-        fdns_domains = fdns_html_parser(html_response.text)
-        if fdns_domains:
-            with alive_bar(len(fdns_domains), force_tty=True) as bar:
-                for fdomain in fdns_domains:
-                    if check_useless_domain(fdomain):
-                        domain_checker(fdomain)
-                    bar.text(fdomain)
-                    bar()
-        else:
-            print(colored("Forward DNS Domains not found!", "yellow"))
+            print("Checking Reversed Dns Domains ...")
 
-        print(colored("Done!", "green"))
+            if rdns_domains:
+                with alive_bar(len(rdns_domains), force_tty=True) as bar:
+                    for rdomain in rdns_domains:
+                        if check_useless_domain(rdomain):
+                            domain_checker(rdomain)
+                        bar.text(rdomain)
+                        bar()
+            else:
+                print(colored("Reverse DNS Domains not found!", "yellow"))
+            print("Checking Forward Dns Domains ...")
+            fdns_domains = fdns_html_parser(html_response.text)
+            if fdns_domains:
+                with alive_bar(len(fdns_domains), force_tty=True) as bar:
+                    for fdomain in fdns_domains:
+                        if check_useless_domain(fdomain):
+                            domain_checker(fdomain)
+                        bar.text(fdomain)
+                        bar()
+            else:
+                print(colored("Forward DNS Domains not found!", "yellow"))
+
+            print(colored("Done!", "green"))
     else:
         print(colored("Please Enter Valid ipv4 address", "red"))
